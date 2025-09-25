@@ -1,8 +1,6 @@
 # Intel HEX Tool
 
 A graphical utility for parsing, analyzing, and disassembling Intel HEX object files, built with C++, SDL2, and Dear ImGui.
-
-![Intel HEX Tool Screenshot](docs/screenshot.png) 
 *Note: You should create a 'docs' folder and place a screenshot of the running application there.*
 
 ---
