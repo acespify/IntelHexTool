@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/includes",
+                "${workspaceFolder}/includes/imgui",
+                "${workspaceFolder}/includes/SDL2",
+                "${workspaceFolder}/imgui",
+                "${workspaceFolder}/libs"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.26100.0"
+        }
+    ],
+    "version": 4
+}
