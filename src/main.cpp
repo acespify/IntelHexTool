@@ -6,6 +6,7 @@
 
 // Vendor Libraries
 #include "SDL2/SDL.h"
+#include "SDL2/SDL_image.h"
 
 // Local Libraries
 #include "imgui/imgui.h"
@@ -22,8 +23,23 @@
 int main(int, char**) {
     // --- 1. Initialize SDL (Same as before) ---
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) { /* ... error handling ... */ return -1; }
+
+    // Initialize the SDL_image library for PNG loading
+    if(!(IMG_Init(IMG_INIT_PNG))){
+        std::cerr << "ERROR initializing SDL_image: " << IMG_GetError() << std::endl;
+        return -1;
+    }
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window = SDL_CreateWindow("Intel HEX Tool", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+
+    // Load and Set the Window Icon
+    SDL_Surface* icon_surface = IMG_Load("asssets/icon.png");
+    if (icon_surface == NULL){
+        std::cerr << "Worning: Cound not load icon.png: " << IMG_GetError() << std::endl;
+    } else {
+        SDL_SetWindowIcon(window, icon_surface);
+        SDL_FreeSurface(icon_surface); // The window makes its own copy, so we can free this surface.
+    }
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     if (renderer == NULL) { /* ... error handling ... */ return -1; }
 
@@ -217,6 +233,7 @@ int main(int, char**) {
     ImGui::DestroyContext();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    IMG_Quit();
     SDL_Quit();
 
     return 0;

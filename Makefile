@@ -36,7 +36,7 @@ OBJECTS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 INCLUDES := -Iincludes -Iimgui -Iincludes/imgui -Iincludes/SDL2
 
 # Point to the local library files in the "libs" folder
-LIBS := -Llibs -lmingw32 -lSDL2main -lSDL2 -mwindows
+LIBS := -Llibs -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -mwindows
 
 # -- Define DLLs to be copied
 DLLs_TO_COPY := libs/SDL2.dll
