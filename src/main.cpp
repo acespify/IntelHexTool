@@ -149,7 +149,7 @@ int main(int, char**) {
         } else {
             for (const auto& instr : disassembly) {
                 if (symbol_map.count(instr.address)) {
-                    ImGui::Text("");
+                    ImGui::Spacing();
                     ImGui::Text("%s:", symbol_map.at(instr.address).c_str());
                 }
                 ImGui::Text("  0x%04X:  %s", instr.address, instr.instruction_text.c_str());
