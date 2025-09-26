@@ -8,7 +8,7 @@ static uint8_t mem_read(const MemoryMap& memory, uint32_t addr) {
     return(it != memory.end()) ? it->second : 0;
 }
 
-DissassembeledInstruction disassemble_8080_op(const MemoryMap& memory, uint32_t pc, const SymbolMap& symbols) {
+DissassembeledInstruction Disassembler8080::disassemble_op(const MemoryMap& memory, uint32_t pc, const SymbolMap& symbols) {
     DissassembeledInstruction instr = {pc, "???", 1};
     uint8_t opcode = mem_read(memory, pc);
 

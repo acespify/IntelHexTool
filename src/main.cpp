@@ -17,11 +17,12 @@
 // Our Application Code
 #include "HexParser.h"
 #include "Memory.h"
-#include "i8080.h"
+#include "CpuDisassembler.h"
+#include "i8085.h"
 #include "Symbols.h"
 
 int main(int, char**) {
-    // --- 1. Initialize SDL (Same as before) ---
+    // *** 1. Initialize SDL (Same as before) ***
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) { /* ... error handling ... */ return -1; }
 
     // Initialize the SDL_image library for PNG loading
@@ -45,7 +46,7 @@ int main(int, char**) {
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     if (renderer == NULL) { /* ... error handling ... */ return -1; }
 
-    // --- 2. Initialize ImGui (Same as before) ---
+    // *** 2. Initialize ImGui (Same as before) ***
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -53,14 +54,17 @@ int main(int, char**) {
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
 
-    // --- 3. Application State ---
+    // *** 3. Application State ***
+    enum class CpuType { I8080, I8085 };
+    CpuType selected_cpu = CpuType::I8080;
+    std::unique_ptr<CpuDisassembler> disassembler = std::make_unique<Disassembler8080>();
     std::string current_filename = "No file loaded";
     std::vector<HexRecord> loaded_records;
     MemoryMap memory_map; // Add the memory map to our application's state
     std::vector<DissassembeledInstruction> disassembly;
     SymbolMap symbol_map;
 
-    // --- 4. Main Application Loop ---
+    // *** 4. Main Application Loop ***
     bool running = true;
     while (running) {
         SDL_Event event;
@@ -73,7 +77,7 @@ int main(int, char**) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        // --- Our GUI code ---
+        // *** Our GUI code ***
         ImGui::Begin("Intel HEX Tool");
 
         
@@ -98,11 +102,15 @@ int main(int, char**) {
                 memory_map = build_memory_map(loaded_records);
                 symbol_map = generate_symbols(memory_map);
                 disassembly.clear();
-                if(!memory_map.empty()){
+
+                // Need to re-disassemble if the file is loaded OR if the CPU type changes.
+                // Here lets combine the logic
+                if(!memory_map.empty() && disassembly.empty()){
                     uint32_t pc = memory_map.begin()->first;
                     uint32_t end_addr = memory_map.rbegin()->first;
                     while (pc <= end_addr){
-                        DissassembeledInstruction instr = disassemble_8080_op(memory_map,pc, symbol_map);
+                        // using the generic disassembler object, allowing for polymorphisn to handle the rest! (hopefully)
+                        DissassembeledInstruction instr = disassembler->disassemble_op(memory_map, pc, symbol_map);
                         disassembly.push_back(instr);
                         pc += instr.size;
 
@@ -152,12 +160,29 @@ int main(int, char**) {
         }
         ImGui::End();
 
-        ImGui::Begin("8080 Disassembly");
-       if (ImGui::Button("Save Disassembly")) {
-            if (!disassembly.empty()) {
-                ImGuiFileDialog::Instance()->OpenDialog("SaveFileDlgKey", "Choose File", ".asm,.txt");
+        // *** Disassembly window ***
+        ImGui::Begin("Disassembly");
+
+        // Add a dropdown menu (Combo box) for CPU selection
+        const char* cpu_names[] = { "Intel 8080", "Intel 8085"};
+        int current_cpu_index = static_cast<int>(selected_cpu);
+        if (ImGui::Combo("CPU", &current_cpu_index, cpu_names, IM_ARRAYSIZE(cpu_names))){
+            selected_cpu = static_cast<CpuType>(current_cpu_index);
+
+            // When the CPU is changed, create the correct disassembler object.
+            if(selected_cpu == CpuType::I8080){
+                disassembler = std::make_unique<Disassembler8080>();
+            } else if (selected_cpu == CpuType::I8085){
+                disassembler = std::make_unique<Disassembler8085>();
             }
+            disassembly.clear();
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Save Disassembly")) {
+                if (!disassembly.empty()) {
+                    ImGuiFileDialog::Instance()->OpenDialog("SaveFileDlgKey", "Choose File", ".asm,.txt");
+                }
+            }
 
         ImGui::Separator();
 
@@ -221,7 +246,7 @@ int main(int, char**) {
             ImGuiFileDialog::Instance()->Close();
         }
 
-        // --- 5. Render the frame ---
+        // *** 5. Render the frame ***
         ImGui::Render();
         SDL_SetRenderDrawColor(renderer, 45, 55, 60, 255);
         SDL_RenderClear(renderer);
@@ -229,7 +254,7 @@ int main(int, char**) {
         SDL_RenderPresent(renderer);
     }
 
-    // --- 6. Cleanup ---
+    // *** 6. Cleanup ***
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();

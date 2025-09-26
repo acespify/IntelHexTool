@@ -23,6 +23,7 @@ APP_SRCS := \
 	src/HexParser.cpp \
 	src/Memory.cpp \
 	src/i8080.cpp \
+	src/i8085.cpp \
 	src/Symbols.cpp \
 	imgui/ImGuiFileDialog.cpp
 
