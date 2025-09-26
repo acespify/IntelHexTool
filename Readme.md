@@ -77,19 +77,14 @@ You will need a working C++ development environment on Windows. This project is 
 
 ### Building
 
-The included `Makefile` handles both debug and release builds. Open a **UCRT64 terminal** in the project root.
+The included `Makefile` handles release builds only. Open a **UCRT64 terminal** in the project root.
 
-* **To create a debug build (with debugging symbols):**
-    ```sh
-    make debug
-    ```
-    The executable will be located at `build/debug/IntelHexTool.exe`.
 
 * **To create an optimized release build:**
     ```sh
-    make release
+    make 
     ```
-    The executable will be located at `build/release/IntelHexTool.exe`.
+    The executable will be located at `build/IntelHexTool.exe`.
 
 * **To clean all build files:**
     ```sh
