@@ -29,17 +29,19 @@ int main(int, char**) {
         std::cerr << "ERROR initializing SDL_image: " << IMG_GetError() << std::endl;
         return -1;
     }
+    // Creating the window 
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window = SDL_CreateWindow("Intel HEX Tool", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
 
     // Load and Set the Window Icon
-    SDL_Surface* icon_surface = IMG_Load("asssets/icon.png");
+    SDL_Surface* icon_surface = IMG_Load("assets/IHT.png");
     if (icon_surface == NULL){
-        std::cerr << "Worning: Cound not load icon.png: " << IMG_GetError() << std::endl;
+        std::cerr << "Warning: Cound not load icon.png: " << IMG_GetError() << std::endl;
     } else {
         SDL_SetWindowIcon(window, icon_surface);
         SDL_FreeSurface(icon_surface); // The window makes its own copy, so we can free this surface.
     }
+    // Creating the Renderer
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     if (renderer == NULL) { /* ... error handling ... */ return -1; }
 
@@ -80,7 +82,7 @@ int main(int, char**) {
         if (ImGui::Button("Open Hex File")) {
             IGFD::FileDialogConfig config;
             config.path = ".";
-            ImGuiFileDialog::Instance()->OpenDialog("HexFileOpen", "Choose a HEX File", ".hex,.txt,.*", config);
+            ImGuiFileDialog::Instance()->OpenDialog("HexFileOpen", "Choose a HEX File", ".hex,.txt,*.*", config);
         }
         ImGui::SameLine();
         ImGui::Text("Current File: %s", current_filename.c_str());
