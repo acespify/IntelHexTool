@@ -80,8 +80,6 @@ int main(int, char**) {
         // *** Our GUI code ***
         ImGui::Begin("Intel HEX Tool");
 
-        
-
         // -- File Operations --
         if (ImGui::Button("Open Hex File")) {
             IGFD::FileDialogConfig config;
