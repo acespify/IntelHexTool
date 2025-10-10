@@ -6,7 +6,7 @@
 #include "Memory.h"  // Needed for MemoryMap
 #include "Symbols.h" // Needed for SymbolMap
 
-struct DissassembeledInstruction {
+struct DisassembledInstruction {
     uint32_t address;
     std::string instruction_text;
     uint8_t size;  // The number of bytes the instruction occupies (1,2, or 3)
@@ -19,5 +19,5 @@ class CpuDisassembler {
 
         // A pure virtual function that any class cn inherit from.
         // The must provide an implementation for this function.
-        virtual DissassembeledInstruction disassemble_op(const MemoryMap& memory, uint32_t pc, const SymbolMap& symbols) = 0;
+        virtual DisassembledInstruction disassemble_op(const MemoryMap& memory, uint32_t pc, const SymbolMap& symbols) = 0;
 };

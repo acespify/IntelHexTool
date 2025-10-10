@@ -21,15 +21,63 @@
 #include "i8085.h"
 #include "Symbols.h"
 
+// Defining a enum filetype to open
+enum class FileType {
+    Unknown,
+    IntelHex,
+    RawBinary
+};
+
+// This function is to check if a character is valid in an Intel HEX file
+bool is_valid_hex_char(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || ( c >= 'a' && c <= 'f') || c == ':' || isspace(c);
+}
+
+FileType detect_file_type(const std::string& file_path) {
+    std::ifstream file(file_path, std::ios::binary);
+    if (!file.is_open()) {
+        return FileType::Unknown; // Of handle the error appropriately
+    }
+
+    // Read the first 512 bytes for analysis
+    std::vector<char> buffer(512, 0);
+    file.read(buffer.data(), buffer.size());
+
+    if (file.gcount() == 0) {
+        return FileType::Unknown; // Empty or unreadable file
+    }
+
+    // *** Heuristic for Intel HEX ***
+    // 1. Must start with a ':'
+    // 2. All characters should be valid hex/control characters
+    if (buffer[0] == ':') {
+        bool is_plausible_hex = true;
+        for (std::streamsize i = 0; i < file.gcount(); ++i) {
+            if (!is_valid_hex_char(buffer[i])) {
+                is_plausible_hex = false;
+                break;
+            }
+        }
+        if (is_plausible_hex) {
+            return FileType::IntelHex;
+        }
+    }
+
+    // *** If it's not HEX, assume it's Binary for this tool ***
+    return FileType::RawBinary;
+}
+
+
 int main(int, char**) {
     // *** 1. Initialize SDL (Same as before) ***
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) { /* ... error handling ... */ return -1; }
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) { return -1; }
 
     // Initialize the SDL_image library for PNG loading
     if(!(IMG_Init(IMG_INIT_PNG))){
         std::cerr << "ERROR initializing SDL_image: " << IMG_GetError() << std::endl;
         return -1;
     }
+
     // Creating the window 
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window = SDL_CreateWindow("Intel HEX Tool", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
@@ -42,9 +90,10 @@ int main(int, char**) {
         SDL_SetWindowIcon(window, icon_surface);
         SDL_FreeSurface(icon_surface); // The window makes its own copy, so we can free this surface.
     }
+
     // Creating the Renderer
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-    if (renderer == NULL) { /* ... error handling ... */ return -1; }
+    if (renderer == NULL) { return -1; }
 
     // *** 2. Initialize ImGui (Same as before) ***
     IMGUI_CHECKVERSION();
@@ -61,7 +110,7 @@ int main(int, char**) {
     std::string current_filename = "No file loaded";
     std::vector<HexRecord> loaded_records;
     MemoryMap memory_map; // Add the memory map to our application's state
-    std::vector<DissassembeledInstruction> disassembly;
+    std::vector<DisassembledInstruction> disassembly;
     SymbolMap symbol_map;
 
     // *** 4. Main Application Loop ***
@@ -77,62 +126,84 @@ int main(int, char**) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        // *** Our GUI code ***
+        // *** Window 1: Our GUI code ***
         ImGui::Begin("Intel HEX Tool");
 
         // -- File Operations --
-        if (ImGui::Button("Open Hex File")) {
+        if (ImGui::Button("Open File...")) {
             IGFD::FileDialogConfig config;
             config.path = ".";
-            ImGuiFileDialog::Instance()->OpenDialog("HexFileOpen", "Choose a HEX File", ".hex,.txt,*.*", config);
+            ImGuiFileDialog::Instance()->OpenDialog("OpenFileDlgKey", "Choose File", ".hex,.txt,.*", config);
         }
         ImGui::SameLine();
-        ImGui::Text("Current File: %s", current_filename.c_str());
+        if (ImGui::Button("Save Binary...")){
+            if(!memory_map.empty()){
+                ImGuiFileDialog::Instance()->OpenDialog("SaveBinaryDlgKey", "Save Binary File", ".bin");
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Text("File: %s", current_filename.c_str());
 
-        // -- File Dialog Logic --
-        if (ImGuiFileDialog::Instance()->Display("HexFileOpen")) {
-            if (ImGuiFileDialog::Instance()->IsOk()) {
-                std::string file_path = ImGuiFileDialog::Instance()->GetFilePathName();
-                current_filename = ImGuiFileDialog::Instance()->GetCurrentFileName();
-                
-                // Use our new parser to load the file!
-                loaded_records = parse_hex_file(file_path);
-                memory_map = build_memory_map(loaded_records);
-                symbol_map = generate_symbols(memory_map);
-                disassembly.clear();
-
-                // Need to re-disassemble if the file is loaded OR if the CPU type changes.
-                // Here lets combine the logic
-                if(!memory_map.empty() && disassembly.empty()){
-                    uint32_t pc = memory_map.begin()->first;
-                    uint32_t end_addr = memory_map.rbegin()->first;
-                    while (pc <= end_addr){
-                        // using the generic disassembler object, allowing for polymorphisn to handle the rest! (hopefully)
-                        DissassembeledInstruction instr = disassembler->disassemble_op(memory_map, pc, symbol_map);
-                        disassembly.push_back(instr);
-                        pc += instr.size;
-
-                        // Check if the new PC is in a gap.
-                        if (memory_map.find(pc) == memory_map.end()){
-                            // The new PC is not a valid address. Find the next valid one.
-                            auto it = memory_map.upper_bound(pc);
-                            if (it == memory_map.end()){
-                                // If there are no more data left in the map, we are now done.
-                                break;
-                            }
-                            // Jump the PC to the next valid address.
-                            pc = it->first;
-                        }
+        
+        // Need to re-disassemble if the file is loaded OR if the CPU type changes.
+        // Here lets combine the logic
+        if (!memory_map.empty() && disassembly.empty()) {
+            uint32_t pc = memory_map.begin()->first;
+            uint32_t end_addr = memory_map.rbegin()->first;
+            while (pc <= end_addr) {
+                // Heuristic for data blocks
+                uint8_t current_byte = memory_map.count(pc) ? memory_map.at(pc) : 0xFF;
+                if (current_byte == 0x00 || current_byte == 0xFF) {
+                    size_t count = 0;
+                    while (memory_map.count(pc + count) && memory_map.at(pc + count) == current_byte) {
+                        count++;
+                    }
+                    if (count >= 4) {
+                        std::stringstream ss;
+                        ss << "DB   0" << std::hex << std::uppercase << (int)current_byte << "h (" << std::dec << count << " bytes)";
+                        disassembly.push_back({pc, ss.str(), (uint8_t)count});
+                        pc += count;
+                        continue;
                     }
                 }
-            }
-            ImGuiFileDialog::Instance()->Close();
-        }
+                
+                DisassembledInstruction instr = disassembler->disassemble_op(memory_map, pc, symbol_map);
+                disassembly.push_back(instr);
+                pc += instr.size;
 
-        ImGui::Separator();
+                if (memory_map.find(pc) == memory_map.end() && pc <= end_addr) {
+                    auto it = memory_map.upper_bound(pc);
+                    if (it == memory_map.end()) break;
+                    pc = it->first;
+                }
+            }
+            ImGui::Separator();
+
+             // -- Parsed Data Display --
+            ImGui::Text("Raw HEX Records");
+            ImGui::BeginChild("HexView");
+            if (loaded_records.empty()) {
+                ImGui::Text("No data loaded.");
+            } else {
+                for (const auto& record : loaded_records) {
+                    std::stringstream ss;
+                    ss << "T:" << std::hex << std::setw(2) << std::setfill('0') << (int)record.record_type
+                    << "  ADDR: " << std::setw(4) << (int)record.address
+                    << "  LEN: " << std::setw(2) << (int)record.byte_count << "  DATA: ";
+                    for (uint8_t byte : record.data) {
+                        ss << std::setw(2) << static_cast<int>(byte) << " ";
+                    }
+                    ImGui::TextUnformatted(ss.str().c_str());
+                }
+            }
+            ImGui::EndChild();
+        }
+        
+        ImGui::End(); // End Intel HEX Tool window
+
 
         // Add a new window for the Memory Viewer
-        ImGui::Begin("Memory Viewer");
+        ImGui::Begin("Memory Viewer"); // WINDOW 2
         if (memory_map.empty()) {
             ImGui::Text("No data loaded into memory.");
         } else {
@@ -159,7 +230,7 @@ int main(int, char**) {
         ImGui::End();
 
         // *** Disassembly window ***
-        ImGui::Begin("Disassembly");
+        ImGui::Begin("Disassembly"); // WINDOW 3
 
         // Add a dropdown menu (Combo box) for CPU selection
         const char* cpu_names[] = { "Intel 8080", "Intel 8085"};
@@ -186,7 +257,7 @@ int main(int, char**) {
 
         ImGui::BeginChild("DisassemblyScrolling");
         if (disassembly.empty()) {
-            ImGui::Text("No disassembly available. Load a file.");
+            ImGui::Text("No disassembly available. Load a file or select a CPU.");
         } else {
             for (const auto& instr : disassembly) {
                 if (symbol_map.count(instr.address)) {
@@ -199,25 +270,41 @@ int main(int, char**) {
         ImGui::EndChild();
         ImGui::End();
 
+        // -- File Dialog Logic --
+        if (ImGuiFileDialog::Instance()->Display("OpenFileDlgKey")) {
+            if (ImGuiFileDialog::Instance()->IsOk()) {
+                std::string file_path = ImGuiFileDialog::Instance()->GetFilePathName();
+                current_filename = ImGuiFileDialog::Instance()->GetCurrentFileName();
+                
+                // Clear all data before loading new file
+                memory_map.clear();
+                loaded_records.clear();
+                disassembly.clear();
+                symbol_map.clear();
+                
+                FileType type = detect_file_type(file_path);
 
-        // -- Parsed Data Display --
-        ImGui::BeginChild("HexView");
-        if (loaded_records.empty()) {
-            ImGui::Text("No data loaded.");
-        } else {
-            for (const auto& record : loaded_records) {
-                std::stringstream ss;
-                ss << "T:" << std::hex << std::setw(2) << std::setfill('0') << (int)record.record_type
-                   << "  ADDR: " << std::setw(4) << (int)record.address
-                   << "  LEN: " << std::setw(2) << (int)record.byte_count << "  DATA: ";
-                for (uint8_t byte : record.data) {
-                    ss << std::setw(2) << static_cast<int>(byte) << " ";
+                if (type == FileType::IntelHex) {
+                    loaded_records = parse_hex_file(file_path);
+                    memory_map = build_memory_map(loaded_records);
+                } else if (type == FileType::RawBinary) {
+                    // Call your binary parser. Note the 0x0000 base address for Space Invaders.
+                    uint32_t start_offset = find_rom_start_offset(file_path);
+                    memory_map = parse_binary_file(file_path, start_offset);
+                    loaded_records.clear(); // Binary files don't have records
+                } else {
+                    // Handle unknown or error case
+                    current_filename = "Error: Could not identify file type.";
+                    memory_map.clear();
                 }
-                ImGui::TextUnformatted(ss.str().c_str());
-            }
+
+                // Use our new parser to load the file!
+                //loaded_records = parse_hex_file(file_path);
+                //memory_map = build_memory_map(loaded_records);
+                symbol_map = generate_symbols(memory_map);
+            } 
+            ImGuiFileDialog::Instance()->Close();
         }
-        ImGui::EndChild();
-        ImGui::End();
 
         // File Dialog Logic for Saving file
         if(ImGuiFileDialog::Instance()->Display("SaveFileDlgKey")) {

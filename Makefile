@@ -27,10 +27,14 @@ APP_SRCS := \
 	src/Symbols.cpp \
 	imgui/ImGuiFileDialog.cpp
 
+# --- Defining the resource script and its output object ---
+RESOURCE_SRC := resource.rc
+RESOURCE_OBJ := $(BUILD_DIR)/resource.o
+
 
 # combine the application sources with the Imgui Sources
 SRCS := $(APP_SRCS) $(IMGUI_SRCS)
-OBJECTS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
+OBJECTS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS)) $(RESOURCE_OBJ)
 
 # --- Libratries and Includes ---
 # Add paths for both SDL2 and ImGui headers
@@ -40,7 +44,7 @@ INCLUDES := -Iincludes -Iimgui -Iincludes/imgui -Iincludes/SDL2
 LIBS := -Llibs -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -mwindows
 
 # -- Define DLLs to be copied
-DLLs_TO_COPY := libs/SDL2.dll
+DLLs_TO_COPY := libs/SDL2.dll libs/libgcc_s_seh-1.dll libs/libjxl.dll libs/libLerc.dll libs/libstdc++-6.dll libs/libwinpthread-1.dll
 
 # --- Rules ---
 all: $(TARGET)
@@ -53,6 +57,13 @@ $(TARGET): $(OBJECTS)
 	@cp $(DLLs_TO_COPY) $(dir $@) # This is the copy command
 	@echo "Build finished successfully: $(TARGET)"
 
+# --- Rule to compile the resource script ---
+# TThis rule tells 'make' how to build the resource object file
+$(RESOURCE_OBJ): $(RESOURCE_SRC)
+	@echo "Compiling resource file $<..."
+	@mkdir -p $(dir $@)
+	windres -i $< -o $@
+	
 # Generic rule to compile any .cpp file, regardless of its folder
 $(BUILD_DIR)/%.o: %.cpp
 	@echo "Compiling $<..."

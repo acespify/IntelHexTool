@@ -15,5 +15,5 @@
 
 class Disassembler8085 : public Disassembler8080 {
     public:
-        DissassembeledInstruction disassemble_op(const MemoryMap& memory, uint32_t pc, const SymbolMap& symbols) override;
+        DisassembledInstruction disassemble_op(const MemoryMap& memory, uint32_t pc, const SymbolMap& symbols) override;
 };

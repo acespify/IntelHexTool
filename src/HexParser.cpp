@@ -71,3 +71,56 @@ std::vector<HexRecord> parse_hex_file(const std::string& file_path) {
 
     return records;
 }
+
+// A new function to parse raw binary files
+std::map<uint32_t, uint8_t> parse_binary_file(const std::string& file_path, uint32_t base_address) {
+    std::map<uint32_t, uint8_t> data_map;
+    
+    // Open the file in binary mode at the end to get its size
+    std::ifstream file(file_path, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        std::cerr << "ERROR: Could not open binary file: " << file_path << std::endl;
+        return data_map; 
+    }
+
+    //std::streamsize size = file.tellg();
+    file.seekg(base_address, std::ios::beg);
+
+    char byte_buffer = 0;
+    uint32_t current_address = base_address;
+    while (file.get(byte_buffer)){
+        data_map[current_address] = static_cast<uint8_t>(byte_buffer);
+        current_address++;
+    }
+    /*
+    // Read the whole file into a buffer
+    std::vector<char> buffer(size);
+    if (file.read(buffer.data(), size)) {
+        // Populate the memory map with the file data
+        for (int i = 0; i < size; ++i) {
+            data_map[base_address + i] = static_cast<uint8_t>(buffer[i]);
+        }
+    }*/
+    
+    return data_map;
+}
+
+uint32_t find_rom_start_offset(const std::string& file_path) {
+    std::ifstream file(file_path, std::ios::binary);
+    if (!file.is_open()) {
+        return 0; // Return 0 if file can't be opened.
+    }
+
+    uint32_t offset = 0;
+    char byte = 0;
+    while (file.get(byte)) {
+        if (byte != 0x00) {
+            // Found the first non-zero byte, this is our starting offset.
+            return offset;
+        }
+        offset++;
+    }
+
+    // If the file is all zeros ore empty, return 0.
+    return 0;
+}
